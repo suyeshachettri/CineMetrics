@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { parseCSV, computeStats, computeYearlyAvg, computeDiaryStats } from '../../lib/parseCSV'
+import { parseCSV, computeStats, computeDiaryStats } from '../../lib/parseCSV'
 import { enrichFilms } from '../../lib/tmdb'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, LabelList } from 'recharts'
 
@@ -130,7 +130,22 @@ export default function Stats() {
       ).sort((a, b) => a[0].localeCompare(b[0])).map(([decade, count]) => ({ decade, count }))
     : []
 
-  const avgOverTime = data ? computeYearlyAvg(data.films) : []
+  const avgByDecade = data
+  ? Object.entries(
+      data.films.filter(f => f.Rating).reduce((acc, f) => {
+        const y = parseInt(f.Year || f['Release Year'])
+        if (!y) return acc
+        const decade = Math.floor(y / 10) * 10 + 's'
+        if (!acc[decade]) acc[decade] = { sum: 0, count: 0 }
+        acc[decade].sum += parseFloat(f.Rating)
+        acc[decade].count++
+        return acc
+      }, {})
+    ).sort((a, b) => a[0].localeCompare(b[0])).map(([decade, { sum, count }]) => ({
+      decade,
+      avg: Math.round(sum / count * 100) / 100
+    }))
+  : []
 
   const genres = enriched
     ? Object.entries(enriched.reduce((acc, f) => {
@@ -284,16 +299,16 @@ export default function Stats() {
             </div>
           )}
 
-          {avgOverTime.length > 0 && (
+          {avgByDecade.length > 0 && (
             <div className="card">
-              <p style={{ fontWeight: 600, marginBottom: '1rem' }}>Avg rating by release year</p>
+              <p style={{ fontWeight: 600, marginBottom: '1rem' }}>Avg rating by release decade</p>
               <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={avgOverTime}>
-                  <XAxis dataKey="year" stroke="#666" tick={{ fontSize: 10 }} />
-                  <YAxis stroke="#666" domain={[1, 5]} />
+                <BarChart data={avgByDecade}>
+                  <XAxis dataKey="decade" stroke="#666" tick={{ fontSize: 11 }} />
+                  <YAxis stroke="#666" domain={[0, 5]} />
                   <Tooltip {...tooltip} />
-                  <Line type="monotone" dataKey="avg" stroke="#00c030" dot={false} strokeWidth={2} />
-                </LineChart>
+                  <Bar dataKey="avg" fill="#00c030" radius={[4, 4, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           )}
